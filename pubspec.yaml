@@ -1,6 +1,6 @@
 name: gt_secure
 description: "A production-ready Flutter package for secure local storage with AES-256-CBC encryption, automatic key management, in-memory caching, and comprehensive error handling. Perfect for storing sensitive data like authentication tokens, user credentials, and encrypted preferences."
-version: 1.0.0
+version: 1.1.0
 homepage: https://github.com/GauravTechnical24/gt_secure.git
 repository: https://github.com/GauravTechnical24/gt_secure.git
 issue_tracker: https://github.com/GauravTechnical24/gt_secure/issues
@@ -13,8 +13,8 @@ topics:
   - flutter
 
 environment:
-  sdk: ^3.9.2
-  flutter: ">=1.17.0"
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
 
 dependencies:
   flutter:
@@ -26,6 +26,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 flutter:

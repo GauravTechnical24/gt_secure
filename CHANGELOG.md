@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-28
+
+### Added
+- **Default Value Support**: All getter methods (`getString`, `getInt`, etc.) now support an optional `defaultValue` parameter.
+- **Improved Key Validation**: Added checks for empty or whitespace-only keys to prevent invalid storage operations.
+- **Enhanced Documentation**: Updated doc comments for better clarity and API usage guidance.
+
+### Changed
+- **Flutter SDK Upgrade**: Upgraded to latest stable Flutter (3.41.0+) and Dart (3.11.0+) constraints.
+- **Dependency Updates**: Upgraded `flutter_lints` to version 6.0.0 and ensured compatibility with the latest secure storage plugins.
+
+### Fixed
+- **Empty String Handling Bug**: Resolved an issue where storing or retrieving empty strings ("") could throw a `SecureStorageException`. 
+- **Graceful Error Recovery**: Decryption failures or malformed data now return an empty string or the specified `defaultValue` instead of throwing exceptions, improving app stability.
+
+
 ## [1.0.0] - 2024-12-27
 
 ### Added

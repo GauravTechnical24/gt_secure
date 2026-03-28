@@ -409,6 +409,43 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
 
                   const SizedBox(height: 16),
 
+                  // Edge Case Testing Section
+                  Card(
+                    color: Theme.of(context).colorScheme.tertiaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Edge Case Testing (v1.1.0)',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _testEmptyString,
+                                  child: const Text('Test Empty String'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _testDefaultValue,
+                                  child: const Text('Test Default Value'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
                   // Status Message
                   if (_statusMessage.isNotEmpty)
                     Container(
@@ -431,5 +468,47 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
               ),
             ),
     );
+  }
+
+  Future<void> _testEmptyString() async {
+    setState(() => _isLoading = true);
+    try {
+      const testKey = 'empty_test_key';
+      // Saving an empty string should not throw
+      await secureStorage.setString(testKey, "");
+      final retrieved = await secureStorage.getString(testKey);
+
+      setState(() {
+        _storedValue = 'Retrieved: "$retrieved"';
+        _statusMessage = 'Successfully saved and retrieved empty string!';
+      });
+      await _loadAllKeys();
+    } catch (e) {
+      _showError('Empty string test failed: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _testDefaultValue() async {
+    setState(() => _isLoading = true);
+    try {
+      const nonExistentKey = 'this_key_does_not_exist';
+      const defaultValue = 'I am the default';
+
+      final result = await secureStorage.getString(
+        nonExistentKey,
+        defaultValue: defaultValue,
+      );
+
+      setState(() {
+        _storedValue = result ?? 'Returned null (unexpected)';
+        _statusMessage = 'Successfully tested default value behavior!';
+      });
+    } catch (e) {
+      _showError('Default value test failed: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 }

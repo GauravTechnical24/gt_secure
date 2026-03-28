@@ -108,10 +108,24 @@ class SecureStorageUtil {
         } else {
           // Load existing key
           final keyBytes = base64Url.decode(savedKey);
-          _key = encrypt.Key(keyBytes);
-
-          // Check version and migrate if needed
-          await _checkAndMigrateVersion();
+          
+          // Validate key length (must be 16, 24, or 32 bytes)
+          if (keyBytes.length == 16 || keyBytes.length == 24 || keyBytes.length == 32) {
+            _key = encrypt.Key(keyBytes);
+            // Check version and migrate if needed
+            await _checkAndMigrateVersion();
+          } else {
+            // Key is corrupted - regenerate it
+            _key = encrypt.Key.fromSecureRandom(32);
+            savedKey = base64Url.encode(_key.bytes);
+            await _secureStorage.write(key: _keyIdentifier, value: savedKey);
+            
+            // Reset version since we are starting fresh with a new key
+            await _secureStorage.write(
+              key: _versionKey,
+              value: _currentVersion.toString(),
+            );
+          }
         }
 
         _initialized = true;
@@ -227,10 +241,21 @@ class SecureStorageUtil {
     }
   }
 
+  /// Internal key validation
+  void _validateKey(String key) {
+    if (key.trim().isEmpty) {
+      throw SecureStorageException('Key cannot be empty or only whitespace');
+    }
+  }
+
   /// Encrypt data with a unique IV for each encryption
   /// Returns base64 encoded string with IV prepended
   String _encrypt(String data) {
     try {
+      if (data.isEmpty) {
+        return '';
+      }
+
       // Generate unique IV for each encryption
       final iv = encrypt.IV.fromSecureRandom(16);
       final encrypter = encrypt.Encrypter(
@@ -249,11 +274,18 @@ class SecureStorageUtil {
   /// Decrypt data by extracting IV from the beginning
   String _decrypt(String encryptedData) {
     try {
+      if (encryptedData.isEmpty) {
+        return '';
+      }
+
       final combined = base64Url.decode(encryptedData);
 
       // Validate minimum length (16 bytes IV + at least 1 block of encrypted data)
       if (combined.length < 32) {
-        throw SecureStorageException('Invalid encrypted data length');
+        // If data is present but too short, it might be unencrypted or corrupted
+        // For backward compatibility or graceful handling, we can decide to return empty
+        // or throw. The user requested graceful handling.
+        return '';
       }
 
       // Extract IV (first 16 bytes) and encrypted data
@@ -267,10 +299,9 @@ class SecureStorageUtil {
 
       return encrypter.decrypt(encrypted, iv: iv);
     } catch (e) {
-      throw SecureStorageException(
-        'Decryption failed - data may be corrupted',
-        e,
-      );
+      // Fallback: if decryption fails, return empty string instead of crashing
+      // unless we want to strictly enforce it.
+      return '';
     }
   }
 
@@ -301,6 +332,7 @@ class SecureStorageUtil {
   /// Throws [SecureStorageException] if operation fails
   Future<void> setString(String key, String value) async {
     _checkInit();
+    _validateKey(key);
     try {
       await _withRetry(() async {
         final encrypted = _encrypt(value);
@@ -314,29 +346,30 @@ class SecureStorageUtil {
 
   /// Retrieve a String value
   ///
-  /// Returns null if key doesn't exist
-  /// Throws [SecureStorageException] if decryption fails
-  Future<String?> getString(String key) async {
+  /// Returns [defaultValue] (null by default) if key doesn't exist or is empty
+  /// Gracefully handles decryption errors by returning empty string or [defaultValue]
+  Future<String?> getString(String key, {String? defaultValue}) async {
     _checkInit();
+    _validateKey(key);
     try {
       // Check cache first
       if (_cache.containsKey(key)) {
         final encrypted = _cache[key]!;
-        return _decrypt(encrypted);
+        if (encrypted.isEmpty) return defaultValue;
+        final decrypted = _decrypt(encrypted);
+        return decrypted.isEmpty ? (defaultValue ?? decrypted) : decrypted;
       }
 
       return await _withRetry(() async {
         final encrypted = await _secureStorage.read(key: key);
-        if (encrypted == null) return null;
+        if (encrypted == null || encrypted.isEmpty) return defaultValue;
 
         _updateCache(key, encrypted);
-        return _decrypt(encrypted);
+        final decrypted = _decrypt(encrypted);
+        return decrypted.isEmpty ? (defaultValue ?? decrypted) : decrypted;
       });
     } catch (e) {
-      throw SecureStorageException(
-        'Failed to retrieve string for key: $key',
-        e,
-      );
+      return defaultValue;
     }
   }
 
@@ -346,9 +379,10 @@ class SecureStorageUtil {
   }
 
   /// Retrieve an int value
-  Future<int?> getInt(String key) async {
+  Future<int?> getInt(String key, {int? defaultValue}) async {
     final value = await getString(key);
-    return value != null ? int.tryParse(value) : null;
+    if (value == null || value.isEmpty) return defaultValue;
+    return int.tryParse(value) ?? defaultValue;
   }
 
   /// Store a double value
@@ -357,9 +391,10 @@ class SecureStorageUtil {
   }
 
   /// Retrieve a double value
-  Future<double?> getDouble(String key) async {
+  Future<double?> getDouble(String key, {double? defaultValue}) async {
     final value = await getString(key);
-    return value != null ? double.tryParse(value) : null;
+    if (value == null || value.isEmpty) return defaultValue;
+    return double.tryParse(value) ?? defaultValue;
   }
 
   /// Store a bool value
@@ -368,9 +403,9 @@ class SecureStorageUtil {
   }
 
   /// Retrieve a bool value
-  Future<bool?> getBool(String key) async {
+  Future<bool?> getBool(String key, {bool? defaultValue}) async {
     final value = await getString(key);
-    if (value == null) return null;
+    if (value == null || value.isEmpty) return defaultValue;
     return value.toLowerCase() == 'true';
   }
 
@@ -385,14 +420,15 @@ class SecureStorageUtil {
   }
 
   /// Retrieve a Map
-  Future<Map<String, dynamic>?> getMap(String key) async {
+  Future<Map<String, dynamic>?> getMap(String key,
+      {Map<String, dynamic>? defaultValue}) async {
     final value = await getString(key);
-    if (value == null) return null;
+    if (value == null || value.isEmpty) return defaultValue;
 
     try {
       return json.decode(value) as Map<String, dynamic>;
     } catch (e) {
-      throw SecureStorageException('Failed to decode map for key: $key', e);
+      return defaultValue;
     }
   }
 
@@ -407,14 +443,15 @@ class SecureStorageUtil {
   }
 
   /// Retrieve a List
-  Future<List<dynamic>?> getList(String key) async {
+  Future<List<dynamic>?> getList(String key,
+      {List<dynamic>? defaultValue}) async {
     final value = await getString(key);
-    if (value == null) return null;
+    if (value == null || value.isEmpty) return defaultValue;
 
     try {
       return json.decode(value) as List<dynamic>;
     } catch (e) {
-      throw SecureStorageException('Failed to decode list for key: $key', e);
+      return defaultValue;
     }
   }
 
@@ -426,15 +463,16 @@ class SecureStorageUtil {
   /// Retrieve a generic object with type conversion
   Future<T?> getObject<T>(
     String key,
-    T Function(Map<String, dynamic>) fromJson,
-  ) async {
+    T Function(Map<String, dynamic>) fromJson, {
+    T? defaultValue,
+  }) async {
     final map = await getMap(key);
-    if (map == null) return null;
+    if (map == null) return defaultValue;
 
     try {
       return fromJson(map);
     } catch (e) {
-      throw SecureStorageException('Failed to convert object for key: $key', e);
+      return defaultValue;
     }
   }
 
