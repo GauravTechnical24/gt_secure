@@ -41,7 +41,6 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
   String _storedValue = '';
   List<String> _allKeys = [];
   bool _isLoading = false;
-  String _statusMessage = '';
 
   @override
   void initState() {
@@ -55,7 +54,6 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
       final keys = await secureStorage.getAllKeys();
       setState(() {
         _allKeys = keys;
-        _statusMessage = 'Loaded ${keys.length} keys';
       });
     } on SecureStorageException catch (e) {
       _showError('Failed to load keys: ${e.message}');
@@ -93,7 +91,6 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
       final value = await secureStorage.getString(key);
       setState(() {
         _storedValue = value ?? 'No value found';
-        _statusMessage = 'Retrieved value for "$key"';
       });
     } on SecureStorageException catch (e) {
       _showError('Failed to retrieve: ${e.message}');
@@ -109,7 +106,6 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
       await _loadAllKeys();
       setState(() {
         _storedValue = '';
-        _statusMessage = 'Deleted "$key"';
       });
       _showSuccess('Key deleted successfully!');
     } on SecureStorageException catch (e) {
@@ -147,7 +143,6 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
       await _loadAllKeys();
       setState(() {
         _storedValue = '';
-        _statusMessage = 'All data cleared';
       });
       _showSuccess('All data cleared!');
     } on SecureStorageException catch (e) {
@@ -204,7 +199,6 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
   }
 
   void _showError(String message) {
-    setState(() => _statusMessage = message);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.red.shade700),
@@ -213,7 +207,6 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
   }
 
   void _showSuccess(String message) {
-    setState(() => _statusMessage = message);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -412,47 +405,5 @@ class _SecureStorageDemoState extends State<SecureStorageDemo> {
               ),
             ),
     );
-  }
-
-  Future<void> _testEmptyString() async {
-    setState(() => _isLoading = true);
-    try {
-      const testKey = 'empty_test_key';
-      // Saving an empty string should not throw
-      await secureStorage.setString(testKey, "");
-      final retrieved = await secureStorage.getString(testKey);
-
-      setState(() {
-        _storedValue = 'Retrieved: "$retrieved"';
-        _statusMessage = 'Successfully saved and retrieved empty string!';
-      });
-      await _loadAllKeys();
-    } catch (e) {
-      _showError('Empty string test failed: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _testDefaultValue() async {
-    setState(() => _isLoading = true);
-    try {
-      const nonExistentKey = 'this_key_does_not_exist';
-      const defaultValue = 'I am the default';
-
-      final result = await secureStorage.getString(
-        nonExistentKey,
-        defaultValue: defaultValue,
-      );
-
-      setState(() {
-        _storedValue = result ?? 'Returned null (unexpected)';
-        _statusMessage = 'Successfully tested default value behavior!';
-      });
-    } catch (e) {
-      _showError('Default value test failed: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
   }
 }
